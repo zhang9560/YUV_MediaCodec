@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:orientation="vertical"
+        android:id="@+id/main"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        tools:context=".MainActivity">
+    <ImageView
+        android:id="@+id/iv_yuv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:scaleType="fitCenter" />
+    <Button
+        android:id="@+id/btn_encode_h264"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Encode H264" />
+    <Button
+        android:id="@+id/btn_encode_hevc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="12dp"
+        android:text="Encode HEVC" />
+</LinearLayout>

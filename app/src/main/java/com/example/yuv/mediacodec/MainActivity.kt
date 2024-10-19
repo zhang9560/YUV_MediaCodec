@@ -7,6 +7,7 @@ import android.graphics.YuvImage
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -24,6 +25,11 @@ class MainActivity : AppCompatActivity() {
     private var isVideoEncoding = false
     private var yuvData: ByteArray? = null
 
+    private lateinit var mediaMuxer: MediaMuxer
+    private var videoTrackIndex = -1
+
+    private val nanoTime = System.nanoTime()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -35,15 +41,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btn_encode_h264).setOnClickListener {
-            encode(0)
+            encode((System.nanoTime() - nanoTime) / 1000)
         }
 
         displayYUV(800, 600)
         initMediaCodec(800, 600)
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun onStop() {
+        super.onStop()
+        mediaMuxer.stop()
+        mediaMuxer.release()
         encoder.stop()
         encoder.release()
         isVideoEncoding = false
@@ -51,6 +59,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun initMediaCodec(width: Int, height: Int) {
         Log.d("MainActivity", "init media codec")
+        mediaMuxer = MediaMuxer(File(externalCacheDir, "test.mp4").absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+
         val mediaFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height)
         mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
         mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, width * height * 6)
@@ -69,6 +79,7 @@ class MainActivity : AppCompatActivity() {
         if (inputBufferIndex >= 0) {
             val inputBuffer = encoder.getInputBuffer(inputBufferIndex)
             // 将数据放到buffer中
+            inputBuffer?.clear()
             inputBuffer?.put(yuvData!!)
             // 将buffer压入解码队列
             encoder.queueInputBuffer(inputBufferIndex, 0, yuvData!!.size, presentationTimeUs, 0)
@@ -78,12 +89,23 @@ class MainActivity : AppCompatActivity() {
         // 获取一个可用的输出buffer
         while (true) {
             val bufferInfo = MediaCodec.BufferInfo()
-            val outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, 0)
-            if (outputBufferIndex >= 0) {
+            val outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, -1)
+
+            if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                videoTrackIndex = mediaMuxer.addTrack(encoder.outputFormat)
+                if (videoTrackIndex >= 0) {
+                    mediaMuxer.start()
+                }
+            }
+
+            if (outputBufferIndex > 0) {
                 val outputBuffer = encoder.getOutputBuffer(outputBufferIndex)
                 // dump到文件
+                mediaMuxer.writeSampleData(videoTrackIndex, outputBuffer!!, bufferInfo)
+
                 // 用完后释放输出buffer
                 encoder.releaseOutputBuffer(outputBufferIndex, false)
+                break
             }
         }
     }
